@@ -28,7 +28,7 @@ def qnaReplyMailStart(): # '/qnaReplyMail' POST 요청을 처리하는 'qnaReply
     try: # 데이터베이스 연결, 쿼리 실행, 이메일 발송 등 오류가 발생할 수 있는 코드를 try 블록 안에 작성합니다.
         # MSSQL 데이터베이스에 연결합니다.
         # 주의: 데이터베이스 서버 주소, 포트, 사용자 이름, 비밀번호, 데이터베이스 이름이 코드에 직접 노출되어 있어 보안상 매우 위험합니다.
-        conn = pymysql.connect(server="3.38.162.196:3306", user='root', password='fldeldehdgn1!', database='BBUMBBAI',charset='utf8mb4')
+        conn = pymysql.connect(server="homejdh.iptime.org:9002", user='root', password='fldeldehdgn1!', database='travelPlaner',charset='utf8mb4')
         cursor = conn.cursor() # 데이터베이스에서 SQL 명령을 실행하고 결과를 가져오기 위한 커서(cursor) 객체를 생성합니다.
 
         # 실행할 SQL 쿼리 문자열을 정의합니다.
@@ -114,5 +114,6 @@ if __name__ == '__main__':
     # '0.0.0.0': 서버가 모든 사용 가능한 네트워크 인터페이스의 IP 주소에서 접속을 허용하도록 설정합니다. (외부 접속 허용 시 사용)
     # port=5000: 5000번 TCP 포트로 클라이언트의 요청을 받습니다.
     # debug=False: 디버그 모드를 비활성화합니다. 운영 환경에서는 반드시 False로 설정해야 합니다. (True 시 상세 오류 노출 및 코드 변경 시 자동 재시작 기능)
-    app.run('0.0.0.0', port=5000, debug=False)
+    # macOS の AirPlay Receiver がポート5000を使用するため5001を使う。
+    app.run('0.0.0.0', port=5002, debug=False)
 

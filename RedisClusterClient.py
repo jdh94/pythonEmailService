@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 import time
 import redis
+import datetime
 import LoggerFactory
 
 logger = LoggerFactory.loggerFactory()
+
 
 class RedisClient():
     def __init__(self):
@@ -23,7 +25,7 @@ class RedisClient():
                 return self.redisClient
             except Exception as ex:
                 logger.error("REDIS CONNECTION ERROR : {e}".format(e=ex))
-                time.sleep(5)
+                time.sleep(2)
 
     def setValue(self, key, value, expireTime):
         try:
