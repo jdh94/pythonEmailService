@@ -28,7 +28,8 @@ class EmlServer:
     def sendMail(self, gubun, authNumber, email):
         try:
             # smtp = smtplib.SMTP("email-smtp.ap-northeast-2.amazonaws.com", 587)
-            smtp = smtplib.SMTP("bbumbbai94@gmail.com", 587)
+            # SMTPホスト: "smtp.gmail.com" が正しい。メールアドレスではない。
+            smtp = smtplib.SMTP("smtp.gmail.com", 587)
             smtp.starttls()
             smtp.login("bbumbbai94@gmail.com", "gzzt flof yrby oeyj")
             logger.info("SMTP SERVER CONNECTION SUCCESS")
@@ -49,11 +50,11 @@ class EmlServer:
 
     def make_template(self, gubun, authNumber, email):
         if gubun == 'join':
-            gubun = '회원가입'
+            gubun = '新規登録'
         else:
-            gubun = '정보수정'
-        subject = '(안내)[뿜빠이]이메일 인증 번호 안내 메일 '
-        senderName = '뿜빠이'
+            gubun = '情報変更'
+        subject = '[TravelPlaner] メール認証番号のご案内'
+        senderName = 'TravelPlaner'
 
         fp = open('AuthNumberInfo.template', 'r', encoding='utf-8')
         msg = MIMEText(fp.read().format(gubun=gubun, authNumber=authNumber), 'html', 'utf-8')
@@ -112,7 +113,7 @@ class EmlServer:
             # To update the code for your own SMTP server, you need to change the SMTP server address and port number in the smtplib.SMTP() function.
 
             # smtp = smtplib.SMTP("email-smtp.ap-northeast-2.amazonaws.com", 587)
-            smtp = smtplib.SMTP("bbumbbai94@gmail.com", 587)
+            smtp = smtplib.SMTP("smtp.gmail.com", 587)
             smtp.starttls()
             # where is this parameter using for?
             # 이 매개변수는 SMTP 서버에 로그인하기 위한 사용자 이름과 비밀번호입니다.

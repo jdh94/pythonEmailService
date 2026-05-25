@@ -1,61 +1,90 @@
 # -*- coding: utf-8 -*-
 
-# what does this import mean? from and import
-# from rediscluster import RedisCluster what does it mean?
-# from rediscluster는 rediscluster 모듈에서 RedisCluster 클래스를 가져오는 것입니다.
-# how can i search the rediscluster? because it is not in the standard library
-# how to search the rediscluster?
-# You can search for the rediscluster library on the Python Package Index (PyPI) or its official documentation.
-# how to search the rediscluster in pypi?
-# You can search for the rediscluster library on the Python Package Index (PyPI) by visiting https://pypi.org/ and entering "rediscluster" in the search bar.
-# redis-py-cluster is a Python client for Redis that supports Redis Cluster.
-# what is redis-py-cluster?
-# redis-py-cluster는 Redis 클러스터를 지원하는 Python 클라이언트입니다.
-# what is cluster?
-# Redis Cluster는 Redis의 분산 데이터베이스 솔루션으로, 데이터를 여러 노드에 분산 저장하여 확장성과 가용성을 높입니다.
-# what is distributed database?
-# 분산 데이터베이스는 데이터를 여러 서버에 분산 저장하여 성능과 가용성을 높이는 데이터베이스 시스템입니다.
-# then is oracle a distributed database?
-# 오라클은 분산 데이터베이스를 지원하는 데이터베이스 관리 시스템입니다. 그러나 기본적으로는 단일 서버에서 실행됩니다.
-from rediscluster import RedisCluster
-from rediscluster.exceptions import RedisClusterException
+# スタンドアロン（単体）Redis サーバーへの接続クライアント。
+# RedisCluster ではなく通常の redis.Redis を使う（Connection Type: Standalone）。
+import redis
+from redis.exceptions import ConnectionError as RedisConnectionError
 import time
+import datetime
 import LoggerFactory
 
 logger = LoggerFactory.loggerFactory()
 
+
+# Redis に接続できない場合（ローカル開発環境など）に使うメモリ代替ストア。
+# { key: (value, expire_datetime) } の辞書で管理する。
+class _InMemoryStore:
+    def __init__(self):
+        self._store: dict = {}
+
+    def set(self, key, value, expire_time):
+        # expire_time は datetime.timedelta を想定する。
+        expires_at = datetime.datetime.now() + expire_time
+        self._store[key] = (value, expires_at)
+        return True
+
+    def get(self, key):
+        entry = self._store.get(key)
+        if entry is None:
+            return None
+        value, expires_at = entry
+        # 有効期限切れの場合は削除して None を返す。
+        if datetime.datetime.now() > expires_at:
+            del self._store[key]
+            return None
+        return value
+
+    def delete(self, key):
+        self._store.pop(key, None)
+        return True
+
+
 class RedisClient():
     def __init__(self):
         self.redisClient = None
+        self._fallback = None  # Redis 接続失敗時のメモリ代替ストア
         self.connect_to_redis()
 
     def connect_to_redis(self):
-        # while True:  # 연결 될때까지 무한 반복
-        for i in range(3):
+        for i in range(2):  # 試行回数を2回に減らして起動を速くする
             try:
-                # Connect to Redis
-                startup_nodes = [
-                    {"host": "3.38.162.192", "port": "6379"}
-#                    ,{"host": "3.38.162.192", "port": "6379"}
-                ]
-                self.redisClient = RedisCluster(startup_nodes=startup_nodes, decode_responses=True,
-                                                password='fldeldehdgn1!')
-                logger.info("REDIS CLUSTER CONNECT")
+                self.redisClient = redis.Redis(
+                    host='homejdh.iptime.org',
+                    port=9003,
+                    password='fldeldehdgn1!',
+                    decode_responses=True,
+                    socket_connect_timeout=2,
+                    socket_timeout=2,
+                )
+                # ping() で実際に接続確認する。
+                self.redisClient.ping()
+                logger.info("REDIS STANDALONE CONNECT SUCCESS")
+                self._fallback = None
                 return self.redisClient
-            except RedisClusterException as ex:
-                logger.error("Failed to connect to Redis server. Retrying in 5 seconds...")
+            except RedisConnectionError as ex:
+                logger.error("Failed to connect to Redis server. Retrying in 2 seconds...")
                 logger.error(ex)
-                time.sleep(5)
+                time.sleep(2)
             except Exception as ex:
                 logger.error("REDIS CONNECTION ERROR : {e}".format(e=ex))
-                time.sleep(5)
+                time.sleep(2)
+
+        # 2回試してもつながらない場合はメモリストアで代替する。
+        # 本番環境では Redis を必ず使うこと。ローカル開発用の措置。
+        logger.error("Redis に接続できません。メモリストアで代替します（開発環境用）。")
+        self._fallback = _InMemoryStore()
+
+    def _use_fallback(self):
+        return self._fallback is not None
 
     def setValue(self, key, value, expireTime):
-        # while True:
         try:
+            if self._use_fallback():
+                self._fallback.set(key, value, expireTime)
+                return "success"
             self.redisClient.set(key, value, expireTime)
             return "success"
-        except RedisClusterException as ex:
+        except RedisConnectionError as ex:
             logger.info('REDIS SET VALUE ERROR :: Reconnecting to Redis server...')
             logger.error(ex)
             self.connect_to_redis()
@@ -65,11 +94,12 @@ class RedisClient():
             return "fail"
 
     def getValue(self, key):
-        #while True:
         try:
+            if self._use_fallback():
+                return self._fallback.get(key)
             result = self.redisClient.get(key)
             return result
-        except RedisClusterException as ex:
+        except RedisConnectionError as ex:
             logger.info('REDIS GET VALUE ERROR :: Reconnecting to Redis server...')
             logger.error(ex)
             self.connect_to_redis()
@@ -79,11 +109,13 @@ class RedisClient():
             return "fail"
 
     def delValue(self, key):
-        #while True:
         try:
+            if self._use_fallback():
+                self._fallback.delete(key)
+                return "success"
             self.redisClient.delete(key)
             return "success"
-        except RedisClusterException as ex:
+        except RedisConnectionError as ex:
             logger.info('REDIS DEL VALUE ERROR :: Reconnecting to Redis server...')
             logger.error(ex)
             self.connect_to_redis()
